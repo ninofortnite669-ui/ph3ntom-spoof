@@ -19,8 +19,36 @@ jobs:
         run: |
           $wdkUrl = "https://go.microsoft.com/fwlink/?linkid=2249371"
           $wdkPath = "$env:TEMP\wdksetup.exe"
-          Invoke-WebRequest -Uri $wdkUrl -OutFile $wdkPath
+          Invoke-WebRequest -Uri $wdkUrl -OutFile $wdkPath -UseBasicParsing
           Start-Process -FilePath $wdkPath -ArgumentList "/features + /quiet /norestart" -Wait
+          
+          # Verify WDK installation
+          $wdkInclude = "C:\Program Files (x86)\Windows Kits\10\Include"
+          if (-not (Test-Path "$wdkInclude")) {
+            Write-Error "WDK Include directory not found at $wdkInclude"
+            exit 1
+          }
+          
+          # Find the latest WDK version
+          $versions = Get-ChildItem -Path "$wdkInclude" -Directory | Where-Object { $_.Name -match "^10\.\d+\.\d+\.\d+$" } | Sort-Object Name -Descending
+          if ($versions.Count -eq 0) {
+            Write-Error "No WDK version found in $wdkInclude"
+            Get-ChildItem -Path "$wdkInclude" -Directory | Select-Object Name
+            exit 1
+          }
+          
+          $latestVersion = $versions[0].Name
+          Write-Host "Found WDK version: $latestVersion"
+          
+          # Verify ntddk.h exists
+          $ntddkPath = "$wdkInclude\$latestVersion\km\ntddk.h"
+          if (-not (Test-Path $ntddkPath)) {
+            Write-Error "ntddk.h not found at $ntddkPath"
+            Get-ChildItem -Path "$wdkInclude\$latestVersion\km" -Recurse | Select-Object FullName
+            exit 1
+          }
+          
+          Write-Host "WDK verified: ntddk.h found at $ntddkPath"
       
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
@@ -32,14 +60,39 @@ jobs:
       - name: Build Driver (UNSIGNED - DSE Bypass Ready)
         shell: cmd
         run: |
+          :: Setup Visual Studio environment
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          
+          :: Find WDK version
           for /d %%I in ("C:\Program Files (x86)\Windows Kits\10\Include\10.*") do set KITVER=%%~nxI
-          set KITINC=C:\Program Files (x86)\Windows Kits\10\Include\%KITVER%
+          if "%KITVER%"=="" (
+            echo [ERROR] WDK Include directory not found
+            dir "C:\Program Files (x86)\Windows Kits\10\Include"
+            exit /b 1
+          )
+          
+          :: Setup WDK paths
+          set KITINC=C:\Program Files (x86)\Windows Kits\10\Include\%KITVER%\km
           set KITLIB=C:\Program Files (x86)\Windows Kits\10\Lib\%KITVER%\km\x64
-          set INCLUDE=%KITINC%\km;%KITINC%\shared;%KITINC%\km\crt;%INCLUDE%
+          
+          :: Verify ntddk.h exists
+          if not exist "%KITINC%\ntddk.h" (
+            echo [ERROR] ntddk.h not found at %KITINC%\ntddk.h
+            dir "%KITINC%"
+            exit /b 1
+          )
+          
+          :: Add WDK to include path
+          set INCLUDE=%KITINC%;%KITINC%\..\shared;%INCLUDE%
           set LIB=%KITLIB%;%LIB%
+          
+          echo [INFO] WDK Version: %KITVER%
+          echo [INFO] WDK Include: %KITINC%
+          echo [INFO] WDK Lib: %KITLIB%
+          
+          :: Build the driver
           cd hwid-spoofer\driver
-          msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\bin\ /nologo /m
+          msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\bin\ /nologo /m /p:WindowsTargetPlatformVersion=10.0 /p:TargetVersion=Windows10
       
       - name: Build Mapper
         shell: cmd
@@ -53,7 +106,7 @@ jobs:
         run: |
           $url = "https://github.com/Ch0pin/medusa/raw/master/iqvw64e.sys"
           $out = "hwid-spoofer/bin/iqvw64e.sys"
-          Invoke-WebRequest -Uri $url -OutFile $out
+          Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
       
       - name: Create README with Instructions
         shell: cmd
@@ -63,14 +116,14 @@ jobs:
           echo ============================================ >> hwid-spoofer/bin/README.txt
           echo. >> hwid-spoofer/bin/README.txt
           echo FILES: >> hwid-spoofer/bin/README.txt
-          echo   - Ph3ntomSpoof.sys (UNSIGNED - Uses DSE Bypass) >> hwid-spoofer/bin/README.txt
+          echo   - BraveHWID_Spoof.sys (UNSIGNED - Uses DSE Bypass) >> hwid-spoofer/bin/README.txt
           echo   - mapper.exe (Control Interface) >> hwid-spoofer/bin/README.txt
           echo   - iqvw64e.sys (Intel Exploit for DSE Bypass) >> hwid-spoofer/bin/README.txt
           echo. >> hwid-spoofer/bin/README.txt
           echo USAGE: >> hwid-spoofer/bin/README.txt
           echo   1. Run as Administrator >> hwid-spoofer/bin/README.txt
           echo   2. cd to bin\ folder >> hwid-spoofer/bin/README.txt
-          echo   3. mapper.exe Ph3ntomSpoof.sys iqvw64e.sys >> hwid-spoofer/bin/README.txt
+          echo   3. mapper.exe BraveHWID_Spoof.sys iqvw64e.sys >> hwid-spoofer/bin/README.txt
           echo   OR: mapper.exe (for interactive menu) >> hwid-spoofer/bin/README.txt
           echo. >> hwid-spoofer/bin/README.txt
           echo NOTE: Driver uses DSE bypass via iqvw64e.sys >> hwid-spoofer/bin/README.txt
@@ -86,6 +139,7 @@ jobs:
           echo   - TPM Endorsement Key >> hwid-spoofer/bin/README.txt
           echo   - CPU Information >> hwid-spoofer/bin/README.txt
           echo   - Anti-Cheat Cleaner (EAC/BE/VAC) >> hwid-spoofer/bin/README.txt
+          echo   - ARP Spoofing >> hwid-spoofer/bin/README.txt
           echo ============================================ >> hwid-spoofer/bin/README.txt
       
       - name: List Output Files
@@ -97,7 +151,7 @@ jobs:
           dir hwid-spoofer\bin\ /b
           echo ""
           echo "=== DRIVER STATUS ==="
-          echo "Ph3ntomSpoof.sys: UNSIGNED (DSE Bypass via iqvw64e.sys)"
+          echo "BraveHWID_Spoof.sys: UNSIGNED (DSE Bypass via iqvw64e.sys)"
           echo "No signature required - uses CVE-2015-2291 exploit"
       
       - name: Upload Artifacts

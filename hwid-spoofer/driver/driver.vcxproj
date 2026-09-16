@@ -10,6 +10,7 @@
     <ProjectGuid>{B2C3D4E5-F607-4891-BCDE-F12345678901}</ProjectGuid>
     <RootNamespace>spoofer</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsSDKVersion>10.0</WindowsSDKVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration">
@@ -20,6 +21,8 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <Driver_SpectreMitigation>false</Driver_SpectreMitigation>
     <SignMode>Off</SignMode>
+    <UseOfMfc>Dynamic</UseOfMfc>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
@@ -27,19 +30,30 @@
     <IntDir>$(SolutionDir)obj\driver\</IntDir>
     <TargetName>BraveHWID_Spoof</TargetName>
     <TargetExt>.sys</TargetExt>
+    <WdkDir>$(WDK_DIR)</WdkDir>
+    <KernelMode>true</KernelMode>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>NDEBUG;_AMD64_;_WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)src;$(ProjectDir)src\cleaner;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;_AMD64_;_WIN64;_KERNEL_MODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)src;$(ProjectDir)src\cleaner;C:\Program Files (x86)\Windows Kits\10\Include\$(WindowsSDKVersion)\km;C:\Program Files (x86)\Windows Kits\10\Include\$(WindowsSDKVersion)\shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <DisableSpecificWarnings>4100;4127;4200;4201;4204;4214;4244;4152;4133;4047;4024;4389;4706;4115;4013;4101;4102;4005;4018</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ntoskrnl.lib;hal.lib;wmilib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\Windows Kits\10\Lib\$(WindowsSDKVersion)\km\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Subsystem>Native</Subsystem>
+      <EntryPointSymbol>DriverEntry</EntryPointSymbol>
+      <BaseAddress>0x10000</BaseAddress>
+      <Driver>WDM</Driver>
     </Link>
+    <Midl>
+      <PreprocessorDefinitions>_AMD64_;_WIN64</PreprocessorDefinitions>
+    </Midl>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\entry.c" />
@@ -53,9 +67,11 @@
     <ClCompile Include="src\volume_spoof.c" />
     <ClCompile Include="src\tpm_ek_spoof.c" />
     <ClCompile Include="src\cleaner\anti_cheat_cleaner.c" />
+    <ClCompile Include="src\arp_spoof.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\spoofer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Driver.targets" />
 </Project>

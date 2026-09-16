@@ -108,6 +108,7 @@ brave_hwid_spoof/
 │  [4] Full Clean + Spoof (RECOMMANDÉ)                     │
 │  [5] Check Status                                        │
 │  [6] Exit                                               │
+│  [7] ULTIMATE: Clean+Spoof+Auto-Relaunch (NOUVEAU!)
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -121,6 +122,7 @@ brave_hwid_spoof/
 | **🔹 [4] Full Clean + Spoof** | **⭐ RECOMMANDÉ** Nettoie + active le spoofing | Premier lancement ou après un ban |
 | **🔹 [5] Check Status** | Affiche l'état actuel du spoofing | Pour vérifier que tout fonctionne |
 | **🔹 [6] Exit** | Quitte le programme | Quand tu as fini |
+| **🔥 [7] ULTIMATE Mode** | **Nettoie + Spoof + Auto-Relaunch** | **Meilleure option pour une protection permanente** |
 
 ---
 

@@ -19,8 +19,7 @@
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>false</UseDebugLibraries>
     <Driver_SpectreMitigation>false</Driver_SpectreMitigation>
-    <SignMode>TestSign</SignMode>
-    <TestCertificateThumbprint>3E58F291936742C6A7182C667C4E6F98B8470209</TestCertificateThumbprint>
+    <SignMode>Off</SignMode>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>

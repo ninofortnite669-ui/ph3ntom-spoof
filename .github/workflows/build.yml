@@ -29,7 +29,7 @@ jobs:
         run: mkdir -p bin
         shell: cmd
       
-      - name: Build Driver
+      - name: Build Driver (Unsigned)
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
@@ -55,16 +55,20 @@ jobs:
           $out = "bin/iqvw64e.sys"
           Invoke-WebRequest -Uri $url -OutFile $out
       
-      - name: Rename Output Files
+      - name: List Output Files
         shell: cmd
         run: |
-          cd bin
-          ren Ph3ntomSpoof.sys Ph3ntomSpoof.sys
-          ren mapper.exe Ph3ntom_Mapper.exe
+          echo "=== BINARY OUTPUT LOCATION ==="
+          echo "Driver: bin\Ph3ntomSpoof.sys (UNSIGNED)"
+          echo "Mapper: bin\mapper.exe"
+          echo "Intel Exploit: bin\iqvw64e.sys"
+          echo ""
+          echo "=== FILE LIST ==="
+          dir bin\ /b
       
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ph3ntom-spoofer
+          name: ph3ntom-spoofer-unsigned
           path: bin/
           retention-days: 7

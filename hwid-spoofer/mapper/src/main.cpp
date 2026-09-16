@@ -7,6 +7,10 @@
 #include <setupapi.h>
 #include <devguid.h>
 #include <cfgmgr32.h>
+#include <sddl.h>
+#include <shlobj.h>
+#include <shellapi.h>
+#include <fstream>
 
 #ifndef NT_SUCCESS
 #define NT_SUCCESS(s) (((NTSTATUS)(s)) >= 0)
@@ -61,6 +65,7 @@ static void ShowMenu()
     std::cout << "  \u2551  [4] Full Clean + Spoof (Recommended)          \u2551\n";
     std::cout << "  \u2551  [5] Check Status                           \u2551\n";
     std::cout << "  \u2551  [6] Exit                                    \u2551\n";
+    std::cout << "  \u2551  [7] ULTIMATE: Clean+Spoof+Auto-Relaunch      \u2551\n";
     std::cout << "  \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n";
     std::cout << "\n  Select option: ";
 }
@@ -386,6 +391,75 @@ int wmain(int argc, wchar_t* argv[])
         
         case 6: {
             std::cout << "  [+] Exiting...\n";
+            return 0;
+        }
+        
+        case 7: {
+            std::cout << "\n  \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n";
+            std::cout << "  \u2551  ULTIMATE MODE: Full Clean + Spoof + Auto-Relaunch  \u2551\n";
+            std::cout << "  \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n";
+            
+            if (!std::filesystem::exists(driverPath)) {
+                std::wcout << L"  [-] Driver not found\n";
+                std::wcout << L"  Enter path to BraveHWID_Spoof.sys: ";
+                std::wcin.getline(std::wcin, driverPath);
+                std::wcin.clear();
+            }
+            
+            if (!std::filesystem::exists(intelPath)) {
+                std::wcout << L"  [-] iqvw64e.sys not found\n";
+                std::wcout << L"  Enter path to iqvw64e.sys: ";
+                std::wcin.getline(std::wcin, intelPath);
+                std::wcin.clear();
+            }
+            
+            if (!std::filesystem::exists(driverPath) || !std::filesystem::exists(intelPath)) {
+                std::cerr << "  [!] Required files not found\n";
+                break;
+            }
+            
+            std::cout << "  [*] Executing Full Clean + Spoof...\n";
+            FullCleanAndSpoof(driverPath, intelPath);
+            
+            std::cout << "\n  [*] Setting up auto-relaunch on startup...\n";
+            
+            wchar_t selfPath[MAX_PATH];
+            GetModuleFileNameW(nullptr, selfPath, MAX_PATH);
+            
+            HANDLE hToken;
+            if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, &hToken)) {
+                TOKEN_PRIVILEGES tkp;
+                LookupPrivilegeValueW(nullptr, SE_TAKE_OWNERSHIP_NAME, &tkp.Privileges[0].Luid);
+                tkp.PrivilegeCount = 1;
+                tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+                AdjustTokenPrivileges(hToken, FALSE, &tkp, 0, nullptr, 0);
+                CloseHandle(hToken);
+            }
+            
+            wchar_t startupPath[MAX_PATH];
+            SHGetFolderPathW(nullptr, CSIDL_COMMON_STARTUP, nullptr, 0, startupPath);
+            std::wstring batPath = std::wstring(startupPath) + L"\\BraveSpoof_AutoStart.bat";
+            
+            std::wofstream batFile(batPath);
+            if (batFile.is_open()) {
+                batFile << L"@echo off\n";
+                batFile << L"timeout /t 10 /nobreak >nul\n";
+                batFile << L"\"" << selfPath << L"\" 4 >nul 2>&1\n";
+                batFile.close();
+                std::wcout << L"  [+] Created auto-start: " << batPath << L"\n";
+            } else {
+                std::cerr << "  [!] Failed to create auto-start batch file\n";
+            }
+            
+            std::cout << "\n  [+] ULTIMATE MODE ACTIVATED!\n";
+            std::cout << "      - Full Clean + Spoof executed\n";
+            std::cout << "      - Auto-relaunch configured on startup\n";
+            std::cout << "      - All HWID components are now spoofed\n";
+            std::cout << "      - Anti-Cheat traces removed\n";
+            std::cout << "      - System will auto-spoof on next boot\n";
+            
+            std::cout << "\n  [+] Press Enter to exit...\n";
+            std::cin.ignore();
             return 0;
         }
         

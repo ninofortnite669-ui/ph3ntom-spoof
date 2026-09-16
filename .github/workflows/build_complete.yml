@@ -1,0 +1,71 @@
+name: Ph3ntom-Spoofer-Complete-Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        config: [Release]
+        platform: [x64]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Extract source
+        shell: pwsh
+        run: |
+          if (Test-Path "Ph3ntom_spoof_gh.zip") {
+            Expand-Archive -Path Ph3ntom_spoof_gh.zip -DestinationPath . -Force
+          }
+          if (Test-Path "extracted/hwid-spoofer") {
+            Copy-Item -Path "extracted/hwid-spoofer/*" -Destination "." -Recurse -Force
+          }
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+      
+      - name: Setup WDK
+        shell: pwsh
+        run: |
+          $wdkUrl = "https://go.microsoft.com/fwlink/?linkid=2249371"
+          $wdkPath = "$env:TEMP\wdksetup.exe"
+          Invoke-WebRequest -Uri $wdkUrl -OutFile $wdkPath
+          Start-Process -FilePath $wdkPath -ArgumentList "/features + /quiet /norestart" -Wait
+      
+      - name: Build Driver
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          for /d %%I in ("C:\Program Files (x86)\Windows Kits\10\Include\10.*") do set KITVER=%%~nxI
+          set KITINC=C:\Program Files (x86)\Windows Kits\10\Include\%KITVER%
+          set KITLIB=C:\Program Files (x86)\Windows Kits\10\Lib\%KITVER%\km\x64
+          set INCLUDE=%KITINC%\km;%KITINC%\shared;%KITINC%\km\crt;%INCLUDE%
+          set LIB=%KITLIB%;%LIB%
+          cd hwid-spoofer\driver
+          msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\bin\ /nologo
+      
+      - name: Build Mapper
+        shell: cmd
+        run: |
+          cd hwid-spoofer\mapper
+          msbuild mapper.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\bin\ /nologo
+      
+      - name: Download Intel Driver
+        shell: pwsh
+        run: |
+          $url = "https://github.com/Ch0pin/medusa/raw/master/iqvw64e.sys"
+          $out = "bin/iqvw64e.sys"
+          Invoke-WebRequest -Uri $url -OutFile $out
+      
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ph3ntom-spoofer-complete
+          path: |
+            bin/
+          if-no-files-found: error

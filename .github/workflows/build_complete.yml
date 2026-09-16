@@ -18,36 +18,44 @@ jobs:
           vs-version: '[17.0, 18.0)'
       
       - name: Detect WDK Paths
-        id: detect-wdk
-        shell: cmd
+        shell: pwsh
         run: |
-          :: WDK est pr-install avec VS 2022 sur GitHub Actions windows-2022
+          $wdkBase = "${env:ProgramFiles(x86)}\Windows Kits\10"
+          $includePath = "$wdkBase\Include"
+          $libPath = "$wdkBase\Lib"
           
-          :: Trouver la version la plus rcente du WDK
-          for /d %%V in ("C:\Program Files (x86)\Windows Kits\10\Include\10.*") do (
-            set WDK_VER=%%~nxV
-          )
+          if (-not (Test-Path $includePath)) {
+            Write-Error "WDK Include path not found: $includePath"
+            exit 1
+          }
           
-          if "%WDK_VER%"=="" (
-            for /d %%V in ("C:\Program Files (x86)\Windows Kits\10\Include\*" ) do (
-              set WDK_VER=%%~nxV
-            )
-          )
+          $versionDirs = Get-ChildItem -Path $includePath -Directory | 
+                         Where-Object { $_.Name -match "^\d+\.\d+\.\d+\.\d+$" } | 
+                         Sort-Object Name -Descending
           
-          if not exist "C:\Program Files (x86)\Windows Kits\10\Include\%WDK_VER%\km\ntddk.h" (
-            echo [ERROR] ntddk.h not found
-            dir "C:\Program Files (x86)\Windows Kits\10\Include\%WDK_VER%\km" /b
-            exit /b 1
-          )
+          if ($versionDirs.Count -eq 0) {
+            Write-Error "No WDK version directories found"
+            Get-ChildItem -Path $includePath -Directory | Select-Object Name
+            exit 1
+          }
           
-          set WDK_INC=C:\Program Files (x86)\Windows Kits\10\Include\%WDK_VER%
-          set WDK_KM_INC=C:\Program Files (x86)\Windows Kits\10\Include\%WDK_VER%\km
-          set WDK_LIB=C:\Program Files (x86)\Windows Kits\10\Lib\%WDK_VER%\km\x64
+          $wdkVersion = $versionDirs[0].Name
+          $kmPath = "$includePath\$wdkVersion\km"
+          $ntddkPath = "$kmPath\ntddk.h"
           
-          echo WDK_VERSION=%WDK_VER%>> %GITHUB_ENV%
-          echo WDK_INC=%WDK_INC%>> %GITHUB_ENV%
-          echo WDK_KM_INC=%WDK_KM_INC%>> %GITHUB_ENV%
-          echo WDK_LIB=%WDK_LIB%>> %GITHUB_ENV%
+          if (-not (Test-Path $ntddkPath)) {
+            Write-Error "ntddk.h not found at: $ntddkPath"
+            exit 1
+          }
+          
+          $wdkInc = "$includePath\$wdkVersion"
+          $wdkKmInc = "$kmPath"
+          $wdkLib = "$libPath\$wdkVersion\km\x64"
+          
+          "WDK_VERSION=$wdkVersion" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "WDK_INC=$wdkInc" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "WDK_KM_INC=$wdkKmInc" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "WDK_LIB=$wdkLib" | Out-File -FilePath $env:GITHUB_ENV -Append
       
       - name: Build
         shell: cmd
@@ -58,14 +66,13 @@ jobs:
           set LIB=%WDK_LIB%;%LIB%
           
           if not exist "%WDK_KM_INC%\ntddk.h" (
-            echo [ERROR] ntddk.h not found at %WDK_KM_INC%\ntddk.h
-            dir "%WDK_KM_INC%"
+            echo [ERROR] ntddk.h not found
             exit /b 1
           )
           
           mkdir bin
           cd extracted\hwid-spoofer\driver
-          msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\..\bin\ /nologo /m /p:WindowsTargetPlatformVersion=10.0 /p:TargetVersion=Windows10
+          msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\..\bin\ /nologo /m /p:WindowsTargetPlatformVersion=10.0
           cd ..\mapper
           msbuild mapper.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\..\bin\ /nologo /m
       

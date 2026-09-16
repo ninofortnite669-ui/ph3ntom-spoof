@@ -19,58 +19,73 @@ jobs:
         with:
           vs-version: '[17.0, 18.0)'
       
+      - name: Detect WDK Paths
+        shell: pwsh
+        run: |
+          # WDK est pré-installé avec VS 2022 sur GitHub Actions
+          $wdkBase = "${env:ProgramFiles(x86)}\Windows Kits\10"
+          
+          # Trouver la version la plus récente
+          $includePath = "$wdkBase\Include"
+          $libPath = "$wdkBase\Lib"
+          
+          if (-not (Test-Path $includePath)) {
+            Write-Error "WDK Include path not found: $includePath"
+            exit 1
+          }
+          
+          # Lister les dossiers de version (ex: 10.0.26100.0)
+          $versionDirs = Get-ChildItem -Path $includePath -Directory | 
+                         Where-Object { $_.Name -match "^\d+\.\d+\.\d+\.\d+$" } | 
+                         Sort-Object Name -Descending
+          
+          if ($versionDirs.Count -eq 0) {
+            Write-Error "No WDK version directories found in $includePath"
+            Get-ChildItem -Path $includePath -Directory | Select-Object Name
+            exit 1
+          }
+          
+          $wdkVersion = $versionDirs[0].Name
+          Write-Host "Found WDK version: $wdkVersion"
+          
+          # Vérifier que ntddk.h existe
+          $kmPath = "$includePath\$wdkVersion\km"
+          $ntddkPath = "$kmPath\ntddk.h"
+          
+          if (-not (Test-Path $ntddkPath)) {
+            Write-Error "ntddk.h not found at: $ntddkPath"
+            Write-Host "Searching in: $kmPath"
+            Get-ChildItem -Path $kmPath -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+            exit 1
+          }
+          
+          Write-Host "WDK verified: ntddk.h found at $ntddkPath"
+          
+          # Exporter les chemins pour les étapes suivantes
+          $wdkInc = "$includePath\$wdkVersion"
+          $wdkKmInc = "$kmPath"
+          $wdkLib = "$libPath\$wdkVersion\km\x64"
+          
+          Write-Host "WDK Include: $wdkInc"
+          Write-Host "WDK KM Include: $wdkKmInc"
+          Write-Host "WDK Lib: $wdkLib"
+          
+          # Ajouter au GITHUB_ENV pour accès dans les étapes suivantes
+          "WDK_VERSION=$wdkVersion" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "WDK_INC=$wdkInc" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "WDK_KM_INC=$wdkKmInc" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "WDK_LIB=$wdkLib" | Out-File -FilePath $env:GITHUB_ENV -Append
+      
       - name: Create Output Directory
         run: mkdir -p hwid-spoofer\bin
         shell: cmd
-      
-      - name: Detect WDK Paths
-        id: detect-wdk
-        shell: cmd
-        run: |
-          :: WDK est pré-installé avec VS 2022 sur GitHub Actions windows-2022
-          :: Chemin standard: C:\Program Files (x86)\Windows Kits\10
-          
-          :: Trouver la version la plus récente du WDK
-          for /d %%V in ("C:\Program Files (x86)\Windows Kits\10\Include\10.*") do (
-            set WDK_VER=%%~nxV
-          )
-          
-          :: Si aucune version trouvée, essayer le chemin direct
-          if "%WDK_VER%"=="" (
-            for /d %%V in ("C:\Program Files (x86)\Windows Kits\10\Include\*" ) do (
-              set WDK_VER=%%~nxV
-            )
-          )
-          
-          :: Vérifier que ntddk.h existe
-          if not exist "C:\Program Files (x86)\Windows Kits\10\Include\%WDK_VER%\km\ntddk.h" (
-            echo [ERROR] ntddk.h not found
-            echo Checking: C:\Program Files (x86)\Windows Kits\10\Include\%WDK_VER%\km\ntddk.h
-            dir "C:\Program Files (x86)\Windows Kits\10\Include\%WDK_VER%\km" /b
-            exit /b 1
-          )
-          
-          :: Définir les chemins complets
-          set WDK_INC=C:\Program Files (x86)\Windows Kits\10\Include\%WDK_VER%
-          set WDK_KM_INC=C:\Program Files (x86)\Windows Kits\10\Include\%WDK_VER%\km
-          set WDK_LIB=C:\Program Files (x86)\Windows Kits\10\Lib\%WDK_VER%\km\x64
-          
-          echo WDK_VERSION=%WDK_VER%>> %GITHUB_ENV%
-          echo WDK_INC=%WDK_INC%>> %GITHUB_ENV%
-          echo WDK_KM_INC=%WDK_KM_INC%>> %GITHUB_ENV%
-          echo WDK_LIB=%WDK_LIB%>> %GITHUB_ENV%
-          
-          echo [INFO] WDK Version: %WDK_VER%
-          echo [INFO] WDK Include: %WDK_INC%
-          echo [INFO] WDK KM Include: %WDK_KM_INC%
-          echo [INFO] WDK Lib: %WDK_LIB%
       
       - name: Build Driver (UNSIGNED - DSE Bypass Ready)
         shell: cmd
         run: |
           call "${{ env.VS_INSTALL_PATH }}\VC\Auxiliary\Build\vcvars64.bat"
           
-          :: Configurer les chemins WDK
+          :: Utiliser les variables définies par PowerShell
           set INCLUDE=%WDK_KM_INC%;%WDK_INC%\shared;%INCLUDE%
           set LIB=%WDK_LIB%;%LIB%
           
@@ -79,7 +94,7 @@ jobs:
           
           :: Vérifier que ntddk.h est accessible
           if not exist "%WDK_KM_INC%\ntddk.h" (
-            echo [ERROR] ntddk.h still not found at %WDK_KM_INC%\ntddk.h
+            echo [ERROR] ntddk.h not found at %WDK_KM_INC%\ntddk.h
             dir "%WDK_KM_INC%"
             exit /b 1
           )

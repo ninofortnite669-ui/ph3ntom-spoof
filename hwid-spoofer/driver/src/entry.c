@@ -1,7 +1,7 @@
 #include "../include/spoofer.h"
 
 // Globals
-PDEVICE_OBJECT   g_ControlDevice      = NULL;
+PDEVICE_OBJECT   g_BraveDevice      = NULL;
 PDEVICE_OBJECT   g_DiskFilters[MAX_DISK_HOOKS] = { 0 };
 ULONG            g_DiskFilterCount    = 0;
 BOOLEAN          g_SpoofActive        = FALSE;
@@ -28,8 +28,8 @@ static VOID GenerateDeviceName(VOID)
     LARGE_INTEGER tick;
     KeQuerySystemTime(&tick);
     ULONG rnd = (ULONG)(tick.LowPart ^ tick.HighPart ^ (ULONG)(ULONG_PTR)&tick);
-    swprintf(g_DeviceName, ARRAYSIZE(g_DeviceName), L"\\Device\\Ph3ntom_%08X", rnd);
-    swprintf(g_DeviceDos, ARRAYSIZE(g_DeviceDos), L"\\DosDevices\\Ph3ntom_%08X", rnd);
+    swprintf(g_DeviceName, ARRAYSIZE(g_DeviceName), L"\\Device\\Brave_%08X", rnd);
+    swprintf(g_DeviceDos, ARRAYSIZE(g_DeviceDos), L"\\DosDevices\\Brave_%08X", rnd);
 }
 
 VOID SpDriverUnload(PDRIVER_OBJECT DriverObject)
@@ -62,9 +62,9 @@ VOID SpDriverUnload(PDRIVER_OBJECT DriverObject)
         g_SymlinkExists = FALSE;
     }
 
-    if (g_ControlDevice) {
-        IoDeleteDevice(g_ControlDevice);
-        g_ControlDevice = NULL;
+    if (g_BraveDevice) {
+        IoDeleteDevice(g_BraveDevice);
+        g_BraveDevice = NULL;
     }
 }
 
@@ -213,10 +213,10 @@ static NTSTATUS SpInit(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath
 
     // Create control device
     status = IoCreateDevice(DriverObject, 0, &devName,
-        FILE_DEVICE_UNKNOWN, FILE_DEVICE_SECURE_OPEN, FALSE, &g_ControlDevice);
+        FILE_DEVICE_UNKNOWN, FILE_DEVICE_SECURE_OPEN, FALSE, &g_BraveDevice);
     if (!NT_SUCCESS(status)) return status;
 
-    g_ControlDevice->Flags &= ~DO_DEVICE_INITIALIZING;
+    g_BraveDevice->Flags &= ~DO_DEVICE_INITIALIZING;
 
     // Create DOS symlink
     status = IoCreateSymbolicLink(&dosName, &devName);
@@ -249,7 +249,7 @@ static NTSTATUS SpInit(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath
     g_EdidSpoofActive = TRUE;
     g_VolumeSpoofActive = TRUE;
 
-    DbgPrint("[spoof] Ph3ntom Spoofer Ultimate ready | device: %wZ\n", &devName);
+    DbgPrint("[spoof] Brave Spoofer Ultimate ready | device: %wZ\n", &devName);
     DbgPrint("[spoof] All modules initialized: Disk, SMBIOS, NIC, TPM, EK, CPU, USB, EDID, Volume, Cleaner\n");
 
     return STATUS_SUCCESS;

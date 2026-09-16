@@ -152,7 +152,7 @@ AttachToDisk(PCWSTR DiskPath, PDRIVER_OBJECT DriverObject)
 NTSTATUS SpDiskInitialize(VOID)
 {
     PDRIVER_OBJECT ourDriver = NULL;
-    UNICODE_STRING ourDriverName = RTL_CONSTANT_STRING(L"\\Driver\\Ph3ntomSpoof");
+    UNICODE_STRING ourDriverName = RTL_CONSTANT_STRING(L"\\Driver\\BraveHWID_Spoof");
     NTSTATUS status;
 
     status = ObReferenceObjectByName(&ourDriverName, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,

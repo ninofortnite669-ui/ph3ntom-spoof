@@ -23,8 +23,8 @@ NTKERNELAPI NTSTATUS ObReferenceObjectByName(
 extern POBJECT_TYPE *IoDriverObjectType;
 
 // Device / IOCTL definitions
-#define SPOOFER_DEVICE_NAME     L"\\Device\\Ph3ntomSpoof"
-#define SPOOFER_DOS_LINK        L"\\DosDevices\\Ph3ntomSpoof"
+#define SPOOFER_DEVICE_NAME     L"\\Device\\BraveSpoof"
+#define SPOOFER_DOS_LINK        L"\\DosDevices\\BraveSpoof"
 #define SPOOFER_POOL_TAG        'PHS3'
 
 // IOCTL Codes

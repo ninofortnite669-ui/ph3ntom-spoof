@@ -16,7 +16,7 @@ static void Banner()
 {
     std::cout <<
         "  \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n"
-        "  \u2551     Ph3ntom Spoofer - Ultimate Edition        \u2551\n"
+        "  \u2551     Brave Spoofer - Ultimate Edition        \u2551\n"
         "  \u2551     Complete HWID Spoofing + Cleaner            \u2551\n"
         "  \u2551     DSE Bypass  : iqvw64e CVE-2015-2291      \u2551\n"
         "  \u2551     Features    : All HWID Components        \u2551\n"
@@ -67,7 +67,7 @@ static void ShowMenu()
 
 static bool IsDriverMapped()
 {
-    HANDLE hDevice = CreateFileW(L"\\\\.\\Ph3ntomSpoof", GENERIC_READ | GENERIC_WRITE,
+    HANDLE hDevice = CreateFileW(L"\\\\.\\BraveHWID_Spoof", GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     if (hDevice != INVALID_HANDLE_VALUE) {
         CloseHandle(hDevice);
@@ -78,7 +78,7 @@ static bool IsDriverMapped()
 
 static bool CheckSpoofStatus()
 {
-    HANDLE hDevice = CreateFileW(L"\\\\.\\Ph3ntomSpoof", GENERIC_READ | GENERIC_WRITE,
+    HANDLE hDevice = CreateFileW(L"\\\\.\\BraveHWID_Spoof", GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     
     if (hDevice == INVALID_HANDLE_VALUE) {
@@ -113,7 +113,7 @@ static bool CheckSpoofStatus()
 
 static bool UnmapDriver()
 {
-    HANDLE hDevice = CreateFileW(L"\\\\.\\Ph3ntomSpoof", GENERIC_READ | GENERIC_WRITE,
+    HANDLE hDevice = CreateFileW(L"\\\\.\\BraveHWID_Spoof", GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     
     if (hDevice == INVALID_HANDLE_VALUE) {
@@ -138,7 +138,7 @@ static bool UnmapDriver()
 
 static bool CleanSystem()
 {
-    HANDLE hDevice = CreateFileW(L"\\\\.\\Ph3ntomSpoof", GENERIC_READ | GENERIC_WRITE,
+    HANDLE hDevice = CreateFileW(L"\\\\.\\BraveHWID_Spoof", GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     
     if (hDevice == INVALID_HANDLE_VALUE) {
@@ -288,7 +288,7 @@ int wmain(int argc, wchar_t* argv[])
     std::wstring selfDir = std::filesystem::path(self).parent_path().wstring();
     
     // Default paths
-    driverPath = selfDir + L"\\Ph3ntomSpoof.sys";
+    driverPath = selfDir + L"\\BraveHWID_Spoof.sys";
     intelPath = FindIntelDriver(selfDir);
 
     while (true) {
@@ -307,7 +307,7 @@ int wmain(int argc, wchar_t* argv[])
             
             if (!std::filesystem::exists(driverPath)) {
                 std::wcout << L"  [-] Driver not found at: " << driverPath << L"\n";
-                std::wcout << L"  Enter path to Ph3ntomSpoof.sys: ";
+                std::wcout << L"  Enter path to BraveHWID_Spoof.sys: ";
                 std::wcin.getline(std::wcin, driverPath);
                 std::wcin.clear();
             }
@@ -358,7 +358,7 @@ int wmain(int argc, wchar_t* argv[])
             
             if (!std::filesystem::exists(driverPath)) {
                 std::wcout << L"  [-] Driver not found\n";
-                std::wcout << L"  Enter path to Ph3ntomSpoof.sys: ";
+                std::wcout << L"  Enter path to BraveHWID_Spoof.sys: ";
                 std::wcin.getline(std::wcin, driverPath);
                 std::wcin.clear();
             }

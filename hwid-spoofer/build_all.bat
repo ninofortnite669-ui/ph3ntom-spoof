@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title Ph3ntom Spoofer - Complete Build System
+title Brave Spoofer - Complete Build System
 color 0A
 
 :: ============================================
-:: Ph3ntom Spoofer - Build Script
+:: Brave Spoofer - Build Script
 :: DSE Bypass Driver + Mapper
 :: ============================================
 
@@ -88,7 +88,7 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo [+] Driver built: %BIN_DIR%\Ph3ntomSpoof.sys (UNSIGNED - DSE Bypass ready)
+echo [+] Driver built: %BIN_DIR%\BraveSpoof.sys (UNSIGNED - DSE Bypass ready)
 
 :: ============================================
 :: STEP 4: Build Mapper
@@ -141,7 +141,7 @@ echo ============================================
 echo.
 echo 1. Run as Administrator:
     echo    cd /d "%BIN_DIR%"
-    echo    mapper.exe Ph3ntomSpoof.sys iqvw64e.sys
+    echo    mapper.exe BraveSpoof.sys iqvw64e.sys
 echo.
 echo 2. OR use interactive menu:
     echo    cd /d "%BIN_DIR%"

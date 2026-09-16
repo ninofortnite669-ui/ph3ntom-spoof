@@ -25,7 +25,7 @@
   <PropertyGroup>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)obj\driver\</IntDir>
-    <TargetName>Ph3ntomSpoof</TargetName>
+    <TargetName>BraveHWID_Spoof</TargetName>
     <TargetExt>.sys</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup>

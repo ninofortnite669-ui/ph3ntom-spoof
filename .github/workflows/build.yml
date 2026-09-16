@@ -14,44 +14,63 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup WDK
+      - name: Install WDK and Visual Studio Build Tools
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '[17.0, 18.0)'
+          msbuild-architecture: x64
+      
+      - name: Setup WDK Environment
         shell: pwsh
         run: |
-          $wdkUrl = "https://go.microsoft.com/fwlink/?linkid=2249371"
-          $wdkPath = "$env:TEMP\wdksetup.exe"
-          Invoke-WebRequest -Uri $wdkUrl -OutFile $wdkPath -UseBasicParsing
-          Start-Process -FilePath $wdkPath -ArgumentList "/features + /quiet /norestart" -Wait
+          # Le WDK est inclus avec Visual Studio 2022 sur GitHub Actions
+          # Vérifions le chemin du SDK Windows
+          $vsInstallDir = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Enterprise"
+          $wdkInclude = "${env:ProgramFiles(x86)}\Windows Kits\10\Include"
           
-          # Verify WDK installation
-          $wdkInclude = "C:\Program Files (x86)\Windows Kits\10\Include"
-          if (-not (Test-Path "$wdkInclude")) {
-            Write-Error "WDK Include directory not found at $wdkInclude"
-            exit 1
+          Write-Host "Checking VS Install Dir: $vsInstallDir"
+          Write-Host "Checking WDK Include Dir: $wdkInclude"
+          
+          # Lister ce qui existe
+          if (Test-Path "$vsInstallDir") {
+            Write-Host "VS 2022 found at: $vsInstallDir"
+          } else {
+            Write-Host "VS 2022 NOT found at: $vsInstallDir"
           }
           
-          # Find the latest WDK version
-          $versions = Get-ChildItem -Path "$wdkInclude" -Directory | Where-Object { $_.Name -match "^10\.\d+\.\d+\.\d+$" } | Sort-Object Name -Descending
-          if ($versions.Count -eq 0) {
-            Write-Error "No WDK version found in $wdkInclude"
-            Get-ChildItem -Path "$wdkInclude" -Directory | Select-Object Name
+          if (Test-Path "$wdkInclude") {
+            Write-Host "WDK Include found at: $wdkInclude"
+            $versions = Get-ChildItem -Path "$wdkInclude" -Directory | Where-Object { $_.Name -match "^10\.\d+\.\d+\.\d+$" } | Sort-Object Name -Descending
+            if ($versions.Count -gt 0) {
+              $latestVersion = $versions[0].Name
+              Write-Host "Latest WDK version: $latestVersion"
+              
+              $ntddkPath = "$wdkInclude\$latestVersion\km\ntddk.h"
+              if (Test-Path $ntddkPath) {
+                Write-Host "ntddk.h found at: $ntddkPath"
+                # Stocker la version pour les étapes suivantes
+                Add-Content -Path $env:GITHUB_ENV -Value "WDK_VERSION=$latestVersion"
+                Add-Content -Path $env:GITHUB_ENV -Value "WDK_INCLUDE=$wdkInclude\$latestVersion"
+                Add-Content -Path $env:GITHUB_ENV -Value "WDK_KM_INCLUDE=$wdkInclude\$latestVersion\km"
+                Add-Content -Path $env:GITHUB_ENV -Value "WDK_LIB=$env:ProgramFiles(x86)\Windows Kits\10\Lib\$latestVersion\km\x64"
+                exit 0
+              } else {
+                Write-Error "ntddk.h NOT found at: $ntddkPath"
+                Get-ChildItem -Path "$wdkInclude\$latestVersion\km" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+                exit 1
+              }
+            } else {
+              Write-Error "No WDK version directories found"
+              Get-ChildItem -Path "$wdkInclude" -Directory | Select-Object Name
+              exit 1
+            }
+          } else {
+            Write-Error "WDK Include directory NOT found at: $wdkInclude"
+            # Essayons de trouver où est le WDK
+            Write-Host "Searching for WDK..."
+            Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits" -Recurse -Directory -ErrorAction SilentlyContinue | Select-Object FullName
             exit 1
           }
-          
-          $latestVersion = $versions[0].Name
-          Write-Host "Found WDK version: $latestVersion"
-          
-          # Verify ntddk.h exists
-          $ntddkPath = "$wdkInclude\$latestVersion\km\ntddk.h"
-          if (-not (Test-Path $ntddkPath)) {
-            Write-Error "ntddk.h not found at $ntddkPath"
-            Get-ChildItem -Path "$wdkInclude\$latestVersion\km" -Recurse | Select-Object FullName
-            exit 1
-          }
-          
-          Write-Host "WDK verified: ntddk.h found at $ntddkPath"
-      
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
       
       - name: Create Output Directory
         run: mkdir -p hwid-spoofer\bin
@@ -60,44 +79,36 @@ jobs:
       - name: Build Driver (UNSIGNED - DSE Bypass Ready)
         shell: cmd
         run: |
-          :: Setup Visual Studio environment
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          call "${{ env.VS_INSTALL_PATH }}\VC\Auxiliary\Build\vcvars64.bat"
           
-          :: Find WDK version
-          for /d %%I in ("C:\Program Files (x86)\Windows Kits\10\Include\10.*") do set KITVER=%%~nxI
-          if "%KITVER%"=="" (
-            echo [ERROR] WDK Include directory not found
-            dir "C:\Program Files (x86)\Windows Kits\10\Include"
-            exit /b 1
-          )
+          :: Utiliser les variables d'environnement définies par PowerShell
+          set KITVER=%WDK_VERSION%
+          set KITINC=%WDK_KM_INCLUDE%
+          set KITLIB=%WDK_LIB%
           
-          :: Setup WDK paths
-          set KITINC=C:\Program Files (x86)\Windows Kits\10\Include\%KITVER%\km
-          set KITLIB=C:\Program Files (x86)\Windows Kits\10\Lib\%KITVER%\km\x64
+          echo [INFO] WDK Version: %KITVER%
+          echo [INFO] WDK Include: %KITINC%
+          echo [INFO] WDK Lib: %KITLIB%
           
-          :: Verify ntddk.h exists
+          :: Vérifier que ntddk.h existe
           if not exist "%KITINC%\ntddk.h" (
             echo [ERROR] ntddk.h not found at %KITINC%\ntddk.h
             dir "%KITINC%"
             exit /b 1
           )
           
-          :: Add WDK to include path
+          :: Configurer les chemins
           set INCLUDE=%KITINC%;%KITINC%\..\shared;%INCLUDE%
           set LIB=%KITLIB%;%LIB%
           
-          echo [INFO] WDK Version: %KITVER%
-          echo [INFO] WDK Include: %KITINC%
-          echo [INFO] WDK Lib: %KITLIB%
-          
-          :: Build the driver
+          :: Builder le driver
           cd hwid-spoofer\driver
           msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\bin\ /nologo /m /p:WindowsTargetPlatformVersion=10.0 /p:TargetVersion=Windows10
       
       - name: Build Mapper
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          call "${{ env.VS_INSTALL_PATH }}\VC\Auxiliary\Build\vcvars64.bat"
           cd hwid-spoofer\mapper
           msbuild mapper.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\bin\ /nologo /m
       

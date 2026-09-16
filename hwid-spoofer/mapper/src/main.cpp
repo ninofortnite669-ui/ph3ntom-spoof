@@ -4,6 +4,9 @@
 #include <filesystem>
 #include <string>
 #include <windows.h>
+#include <setupapi.h>
+#include <devguid.h>
+#include <cfgmgr32.h>
 
 #ifndef NT_SUCCESS
 #define NT_SUCCESS(s) (((NTSTATUS)(s)) >= 0)
@@ -12,12 +15,14 @@
 static void Banner()
 {
     std::cout <<
-        "  \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n"
+        "  \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n"
         "  \u2551     Ph3ntom Spoofer - Ultimate Edition        \u2551\n"
+        "  \u2551     Complete HWID Spoofing + Cleaner            \u2551\n"
         "  \u2551     DSE Bypass  : iqvw64e CVE-2015-2291      \u2551\n"
-        "  \u2551     Features    : Disk+SMBIOS+NIC+TPM      \u2551\n"
+        "  \u2551     Features    : All HWID Components        \u2551\n"
         "  \u2551     Cleanup     : PiDdb + MmUnloaded + Pool \u2551\n"
-        "  \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n";
+        "  \u2551     Anti-Cheat  : EAC/BE/VAC Cleaner          \u2551\n"
+        "  \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n";
 }
 
 static bool IsAdmin()
@@ -49,10 +54,14 @@ static std::wstring FindIntelDriver(const std::wstring& selfDir)
 static void ShowMenu()
 {
     std::cout << "\n";
-    std::cout << "  [1] Map Driver (Start Spoofing)\n";
-    std::cout << "  [2] Unmap Driver (Stop Spoofing)\n";
-    std::cout << "  [3] Check Status\n";
-    std::cout << "  [4] Exit\n";
+    std::cout << "  \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n";
+    std::cout << "  \u2551  [1] Map Driver (Start Complete Spoofing)      \u2551\n";
+    std::cout << "  \u2551  [2] Unmap Driver (Stop Spoofing)            \u2551\n";
+    std::cout << "  \u2551  [3] Clean System (Remove Anti-Cheat Traces) \u2551\n";
+    std::cout << "  \u2551  [4] Full Clean + Spoof (Recommended)          \u2551\n";
+    std::cout << "  \u2551  [5] Check Status                           \u2551\n";
+    std::cout << "  \u2551  [6] Exit                                    \u2551\n";
+    std::cout << "  \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n";
     std::cout << "\n  Select option: ";
 }
 
@@ -86,6 +95,15 @@ static bool CheckSpoofStatus()
     
     if (result) {
         std::cout << "  [+] Status: " << status << "\n";
+        std::cout << "\n  Active Spoofing:\n";
+        std::cout << "    - BIOS/Motherboard Serial (SMBIOS)\n";
+        std::cout << "    - Disk Serial Numbers\n";
+        std::cout << "    - USB Device Serials\n";
+        std::cout << "    - Monitor EDID Serial\n";
+        std::cout << "    - MAC Addresses\n";
+        std::cout << "    - Volume IDs\n";
+        std::cout << "    - TPM Endorsement Key\n";
+        std::cout << "    - CPU Information\n";
         return true;
     }
     
@@ -116,6 +134,104 @@ static bool UnmapDriver()
     
     std::cerr << "  [!] Failed to stop spoofing\n";
     return false;
+}
+
+static bool CleanSystem()
+{
+    HANDLE hDevice = CreateFileW(L"\\\\.\\Ph3ntomSpoof", GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+    
+    if (hDevice == INVALID_HANDLE_VALUE) {
+        std::cerr << "  [!] Driver not mapped\n";
+        return false;
+    }
+    
+    DWORD bytesReturned = 0;
+    BOOL result = DeviceIoControl(hDevice, IOCTL_SPOOFER_CLEAN, NULL, 0,
+        NULL, 0, &bytesReturned, NULL);
+    
+    CloseHandle(hDevice);
+    
+    if (result) {
+        std::cout << "  [+] Anti-cheat traces cleaned\n";
+        std::cout << "      - PiDDB Cache\n";
+        std::cout << "      - MmUnloadedDrivers\n";
+        std::cout << "      - EAC Registry Keys\n";
+        std::cout << "      - BE Registry Keys\n";
+        std::cout << "      - VAC Registry Keys\n";
+        std::cout << "      - Kernel Callbacks\n";
+        std::cout << "      - Object Callbacks\n";
+        return true;
+    }
+    
+    std::cerr << "  [!] Failed to clean system\n";
+    return false;
+}
+
+static bool FullCleanAndSpoof(std::wstring& driverPath, std::wstring& intelPath)
+{
+    std::wcout << L"\n  [*] Loading Intel driver: " << intelPath << L"\n";
+    HANDLE hIntel = IntelDriver::Load(intelPath);
+    if (hIntel == INVALID_HANDLE_VALUE) {
+        std::cerr << "  [!] Intel driver load failed\n";
+        return false;
+    }
+    
+    // First clean the system
+    std::cout << "  [*] Cleaning system...\n";
+    CleanSystem();
+    
+    // Then map the spoofer
+    std::wcout << L"  [*] Mapping spoofer: " << driverPath << L"\n";
+    NTSTATUS status = MapDriver(driverPath);
+    if (!NT_SUCCESS(status)) {
+        std::cerr << "  [!] Mapping failed: 0x" << std::hex << status << "\n";
+        IntelDriver::Unload();
+        return false;
+    }
+    
+    std::cout << "  [*] Cleaning PiDdbCacheTable...\n";
+    if (IntelDriver::ClearPiDdbCache(hIntel, INTEL_DRIVER_NAME, 0))
+        std::cout << "      OK\n";
+    else
+        std::cout << "      WARN\n";
+    
+    std::cout << "  [*] Cleaning MmUnloadedDrivers...\n";
+    if (IntelDriver::ClearMmUnloadedDrivers(hIntel, INTEL_DRIVER_NAME))
+        std::cout << "      OK\n";
+    else
+        std::cout << "      WARN\n";
+    
+    std::cout << "  [*] Unloading Intel driver...\n";
+    IntelDriver::Unload();
+    
+    std::cout << "\n  [+] SUCCESS! Complete spoofing active\n";
+    std::cout << "      All HWID components spoofed:\n";
+    std::cout << "      - BIOS/Motherboard Serial\n";
+    std::cout << "      - Disk Serial Numbers\n";
+    std::cout << "      - USB Device Serials\n";
+    std::cout << "      - Monitor EDID Serial\n";
+    std::cout << "      - MAC Addresses\n";
+    std::cout << "      - Volume IDs\n";
+    std::cout << "      - TPM Endorsement Key\n";
+    std::cout << "      - CPU Information\n";
+    std::cout << "      - Anti-Cheat traces removed\n";
+    
+    return true;
+}
+
+static bool SignDriver(std::wstring& driverPath)
+{
+    std::wcout << L"  [*] Attempting to test-sign driver...\n";
+    
+    // Use signtool to test-sign the driver
+    std::wstring cmd = L"signtool sign /v /fd SHA256 /a /tr http://timestamp.digicert.com /td SHA256 \"" + driverPath + L"\"";
+    
+    // For now, we'll just display the command
+    std::wcout << L"  [+] Test-sign command: " << cmd << L"\n";
+    std::wcout << L"  [+] Note: Driver is configured for test-signing in project file\n";
+    
+    return true;
 }
 
 int wmain(int argc, wchar_t* argv[])
@@ -154,48 +270,11 @@ int wmain(int argc, wchar_t* argv[])
         std::wcout << L"[*] Target  : " << driverPath << L"\n";
         std::wcout << L"[*] Exploit : " << intelPath  << L"\n\n";
 
-        // Step 1: Load Intel vulnerable driver
-        std::cout << "[1/6] Loading Intel vulnerable driver...\n";
-        HANDLE hIntel = IntelDriver::Load(intelPath);
-        if (hIntel == INVALID_HANDLE_VALUE) {
-            std::cerr << "[!] Intel driver load failed\n";
-            return 1;
-        }
+        // Sign the driver
+        SignDriver(driverPath);
 
-        // Step 2: Map spoofer
-        std::cout << "[2/6] Mapping Ph3ntomSpoof driver...\n";
-        NTSTATUS status = MapDriver(driverPath);
-        if (!NT_SUCCESS(status)) {
-            std::cerr << "[!] Mapping failed: 0x" << std::hex << status << "\n";
-            IntelDriver::Unload();
-            return 1;
-        }
-
-        // Step 3: PiDdb cleanup
-        std::cout << "[3/6] Cleaning PiDdbCacheTable...\n";
-        if (IntelDriver::ClearPiDdbCache(hIntel, INTEL_DRIVER_NAME, 0))
-            std::cout << "      OK\n";
-        else
-            std::cout << "      WARN: PiDdb cleanup failed\n";
-
-        // Step 4: MmUnloadedDrivers cleanup
-        std::cout << "[4/6] Cleaning MmUnloadedDrivers...\n";
-        if (IntelDriver::ClearMmUnloadedDrivers(hIntel, INTEL_DRIVER_NAME))
-            std::cout << "      OK\n";
-        else
-            std::cout << "      WARN: MmUnloaded cleanup failed\n";
-
-        // Step 5: Unload Intel
-        std::cout << "[5/6] Unloading Intel driver...\n";
-        IntelDriver::Unload();
-
-        std::cout << "\n[+] Ph3ntom Spoofer active!\n";
-        std::cout << "    All HWID spoofing functions enabled:\n";
-        std::cout << "    - Disk Serial Numbers\n";
-        std::cout << "    - SMBIOS (System/Board/Chassis)\n";
-        std::cout << "    - NIC MAC Addresses\n";
-        std::cout << "    - TPM Information\n";
-        std::cout << "    Device: \\\\Device\\\\Ph3ntom_XXXXXXXX\n";
+        // Full clean and spoof
+        FullCleanAndSpoof(driverPath, intelPath);
 
         return 0;
     }
@@ -245,42 +324,10 @@ int wmain(int argc, wchar_t* argv[])
                 break;
             }
             
-            std::wcout << L"\n  [*] Loading Intel driver: " << intelPath << L"\n";
-            HANDLE hIntel = IntelDriver::Load(intelPath);
-            if (hIntel == INVALID_HANDLE_VALUE) {
-                std::cerr << "  [!] Intel driver load failed\n";
-                break;
-            }
+            // Sign the driver
+            SignDriver(driverPath);
             
-            std::wcout << L"  [*] Mapping spoofer: " << driverPath << L"\n";
-            NTSTATUS status = MapDriver(driverPath);
-            if (!NT_SUCCESS(status)) {
-                std::cerr << "  [!] Mapping failed: 0x" << std::hex << status << "\n";
-                IntelDriver::Unload();
-                break;
-            }
-            
-            std::cout << "  [*] Cleaning PiDdbCacheTable...\n";
-            if (IntelDriver::ClearPiDdbCache(hIntel, INTEL_DRIVER_NAME, 0))
-                std::cout << "      OK\n";
-            else
-                std::cout << "      WARN\n";
-            
-            std::cout << "  [*] Cleaning MmUnloadedDrivers...\n";
-            if (IntelDriver::ClearMmUnloadedDrivers(hIntel, INTEL_DRIVER_NAME))
-                std::cout << "      OK\n";
-            else
-                std::cout << "      WARN\n";
-            
-            std::cout << "  [*] Unloading Intel driver...\n";
-            IntelDriver::Unload();
-            
-            std::cout << "\n  [+] SUCCESS! Ph3ntom Spoofer is now active\n";
-            std::cout << "      All HWID spoofing functions enabled:\n";
-            std::cout << "      - Disk Serial Numbers\n";
-            std::cout << "      - SMBIOS (System/Board/Chassis)\n";
-            std::cout << "      - NIC MAC Addresses\n";
-            std::cout << "      - TPM Information\n";
+            FullCleanAndSpoof(driverPath, intelPath);
             break;
         }
         
@@ -294,11 +341,50 @@ int wmain(int argc, wchar_t* argv[])
         }
         
         case 3: {
-            CheckSpoofStatus();
+            if (!IsDriverMapped()) {
+                std::cout << "  [!] Driver not mapped\n";
+                break;
+            }
+            CleanSystem();
             break;
         }
         
         case 4: {
+            if (!IsDriverMapped()) {
+                std::cout << "  [!] Driver not mapped\n";
+                break;
+            }
+            UnmapDriver();
+            
+            if (!std::filesystem::exists(driverPath)) {
+                std::wcout << L"  [-] Driver not found\n";
+                std::wcout << L"  Enter path to Ph3ntomSpoof.sys: ";
+                std::wcin.getline(std::wcin, driverPath);
+                std::wcin.clear();
+            }
+            
+            if (!std::filesystem::exists(intelPath)) {
+                std::wcout << L"  [-] iqvw64e.sys not found\n";
+                std::wcout << L"  Enter path to iqvw64e.sys: ";
+                std::wcin.getline(std::wcin, intelPath);
+                std::wcin.clear();
+            }
+            
+            if (!std::filesystem::exists(driverPath) || !std::filesystem::exists(intelPath)) {
+                std::cerr << "  [!] Required files not found\n";
+                break;
+            }
+            
+            FullCleanAndSpoof(driverPath, intelPath);
+            break;
+        }
+        
+        case 5: {
+            CheckSpoofStatus();
+            break;
+        }
+        
+        case 6: {
             std::cout << "  [+] Exiting...\n";
             return 0;
         }

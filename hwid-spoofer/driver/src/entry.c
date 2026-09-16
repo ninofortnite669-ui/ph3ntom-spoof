@@ -6,6 +6,12 @@ PDEVICE_OBJECT   g_DiskFilters[MAX_DISK_HOOKS] = { 0 };
 ULONG            g_DiskFilterCount    = 0;
 BOOLEAN          g_SpoofActive        = FALSE;
 BOOLEAN          g_TpmSpoofActive     = FALSE;
+BOOLEAN          g_EkSpoofActive      = FALSE;
+BOOLEAN          g_CpuSpoofActive     = FALSE;
+BOOLEAN          g_UsbSpoofActive     = FALSE;
+BOOLEAN          g_EdidSpoofActive    = FALSE;
+BOOLEAN          g_VolumeSpoofActive  = FALSE;
+BOOLEAN          g_CleanerActive      = FALSE;
 
 // Device name obfuscation
 static WCHAR g_DeviceName[64]  = { 0 };
@@ -31,11 +37,23 @@ VOID SpDriverUnload(PDRIVER_OBJECT DriverObject)
     UNREFERENCED_PARAMETER(DriverObject);
     g_SpoofActive = FALSE;
     g_TpmSpoofActive = FALSE;
+    g_EkSpoofActive = FALSE;
+    g_CpuSpoofActive = FALSE;
+    g_UsbSpoofActive = FALSE;
+    g_EdidSpoofActive = FALSE;
+    g_VolumeSpoofActive = FALSE;
+    g_CleanerActive = FALSE;
 
     SpTpmCleanup();
+    SpTpmEkFullCleanup();
     SpNicCleanup();
     SpDiskCleanup();
     SpSmbiosRestore();
+    SpCpuCleanupFull();
+    SpUsbCleanup();
+    SpEdidCleanup();
+    SpVolumeCleanup();
+    SpCleanerCleanup();
 
     if (g_SymlinkExists) {
         UNICODE_STRING dos;
@@ -70,34 +88,100 @@ NTSTATUS SpDispatchControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
     case IOCTL_SPOOFER_SPOOF:
         g_SpoofActive = TRUE;
         g_TpmSpoofActive = TRUE;
+        g_EkSpoofActive = TRUE;
+        g_CpuSpoofActive = TRUE;
+        g_UsbSpoofActive = TRUE;
+        g_EdidSpoofActive = TRUE;
+        g_VolumeSpoofActive = TRUE;
+        
         SpSmbiosRestore();
         status = SpSmbiosInitialize();
         if (NT_SUCCESS(status)) {
             SpTpmInitialize();
+            SpTpmEkFullInitialize();
             ModifyTpmRegistry();
+            SpCpuInitialize();
+            SpUsbInitialize();
+            SpEdidInitialize();
+            SpVolumeInitialize();
+            SpNicInitialize();
+            SpDiskInitialize();
         }
         break;
 
     case IOCTL_SPOOFER_RESTORE:
         g_SpoofActive = FALSE;
         g_TpmSpoofActive = FALSE;
+        g_EkSpoofActive = FALSE;
+        g_CpuSpoofActive = FALSE;
+        g_UsbSpoofActive = FALSE;
+        g_EdidSpoofActive = FALSE;
+        g_VolumeSpoofActive = FALSE;
+        
         SpSmbiosRestore();
         SpTpmCleanup();
+        SpTpmEkFullCleanup();
+        SpCpuCleanupFull();
+        SpUsbCleanup();
+        SpEdidCleanup();
+        SpVolumeCleanup();
+        SpNicCleanup();
+        SpDiskCleanup();
         break;
 
     case IOCTL_SPOOFER_STATUS:
         {
-            CHAR statusBuf[64];
+            CHAR statusBuf[256];
             snprintf(statusBuf, sizeof(statusBuf), 
-                "Spoof: %s, TPM: %s, Disks: %u",
+                "Spoof: %s, TPM: %s, EK: %s, CPU: %s, USB: %s, EDID: %s, Volume: %s, Disks: %u",
                 g_SpoofActive ? "ON" : "OFF",
                 g_TpmSpoofActive ? "ON" : "OFF",
+                g_EkSpoofActive ? "ON" : "OFF",
+                g_CpuSpoofActive ? "ON" : "OFF",
+                g_UsbSpoofActive ? "ON" : "OFF",
+                g_EdidSpoofActive ? "ON" : "OFF",
+                g_VolumeSpoofActive ? "ON" : "OFF",
                 g_DiskFilterCount);
             
             if (Irp->AssociatedIrp.SystemBuffer && Irp->AssociatedIrp.SystemBufferSize >= sizeof(statusBuf)) {
                 memcpy(Irp->AssociatedIrp.SystemBuffer, statusBuf, sizeof(statusBuf));
                 Irp->IoStatus.Information = (ULONG)sizeof(statusBuf);
             }
+        }
+        break;
+
+    case IOCTL_SPOOFER_CLEAN:
+        g_CleanerActive = TRUE;
+        status = FullAntiCheatCleanup();
+        g_CleanerActive = FALSE;
+        break;
+
+    case IOCTL_SPOOFER_FULL:
+        // Full cleanup + spoof
+        g_CleanerActive = TRUE;
+        FullAntiCheatCleanup();
+        g_CleanerActive = FALSE;
+        
+        g_SpoofActive = TRUE;
+        g_TpmSpoofActive = TRUE;
+        g_EkSpoofActive = TRUE;
+        g_CpuSpoofActive = TRUE;
+        g_UsbSpoofActive = TRUE;
+        g_EdidSpoofActive = TRUE;
+        g_VolumeSpoofActive = TRUE;
+        
+        SpSmbiosRestore();
+        status = SpSmbiosInitialize();
+        if (NT_SUCCESS(status)) {
+            SpTpmInitialize();
+            SpTpmEkFullInitialize();
+            ModifyTpmRegistry();
+            SpCpuInitialize();
+            SpUsbInitialize();
+            SpEdidInitialize();
+            SpVolumeInitialize();
+            SpNicInitialize();
+            SpDiskInitialize();
         }
         break;
 
@@ -139,11 +223,17 @@ static NTSTATUS SpInit(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath
     if (NT_SUCCESS(status))
         g_SymlinkExists = TRUE;
 
-    // Initialize hooks
+    // Initialize all spoofing modules
+    SpCleanerInitialize();
     SpDiskInitialize();
     SpSmbiosInitialize();
     SpNicInitialize();
     SpTpmInitialize();
+    SpTpmEkFullInitialize();
+    SpCpuInitialize();
+    SpUsbInitialize();
+    SpEdidInitialize();
+    SpVolumeInitialize();
 
     // Remove symlink for EAC bypass
     if (g_SymlinkExists) {
@@ -153,8 +243,14 @@ static NTSTATUS SpInit(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath
 
     g_SpoofActive = TRUE;
     g_TpmSpoofActive = TRUE;
+    g_EkSpoofActive = TRUE;
+    g_CpuSpoofActive = TRUE;
+    g_UsbSpoofActive = TRUE;
+    g_EdidSpoofActive = TRUE;
+    g_VolumeSpoofActive = TRUE;
 
-    DbgPrint("[spoof] Ph3ntom Spoofer ready | device: %wZ\n", &devName);
+    DbgPrint("[spoof] Ph3ntom Spoofer Ultimate ready | device: %wZ\n", &devName);
+    DbgPrint("[spoof] All modules initialized: Disk, SMBIOS, NIC, TPM, EK, CPU, USB, EDID, Volume, Cleaner\n");
 
     return STATUS_SUCCESS;
 }

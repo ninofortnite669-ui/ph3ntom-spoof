@@ -19,14 +19,13 @@
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>false</UseDebugLibraries>
     <Driver_SpectreMitigation>false</Driver_SpectreMitigation>
-    <SignMode>TestSign</SignMode>
-    <TestCertificateThumbprint>3E58F291936742C6A7182C667C4E6F98B8470209</TestCertificateThumbprint>
+    <SignMode>Off</SignMode>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)obj\driver\</IntDir>
-    <TargetName>Ph3ntomSpoof</TargetName>
+    <TargetName>spoofer</TargetName>
     <TargetExt>.sys</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup>
@@ -34,12 +33,11 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <PreprocessorDefinitions>NDEBUG;_AMD64_;_WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;$(ProjectDir)src;$(ProjectDir)src\cleaner;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ntoskrnl.lib;hal.lib;wmilib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <Subsystem>Native</Subsystem>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -47,13 +45,6 @@
     <ClCompile Include="src\disk_spoof.c" />
     <ClCompile Include="src\smbios_spoof.c" />
     <ClCompile Include="src\nic_spoof.c" />
-    <ClCompile Include="src\tpm_spoof.c" />
-    <ClCompile Include="src\cpu_spoof.c" />
-    <ClCompile Include="src\usb_spoof.c" />
-    <ClCompile Include="src\edid_spoof.c" />
-    <ClCompile Include="src\volume_spoof.c" />
-    <ClCompile Include="src\tpm_ek_spoof.c" />
-    <ClCompile Include="src\cleaner\anti_cheat_cleaner.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\spoofer.h" />

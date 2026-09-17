@@ -10,12 +10,14 @@
     <ProjectGuid>{B2C3D4E5-F607-4891-BCDE-F12345678901}</ProjectGuid>
     <RootNamespace>spoofer</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WdkVersion>10.0</WdkVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <Import Project="$(WDK_DIR)\build\common\tools\km\km_common.props" Condition="exists('$(WDK_DIR)\build\common\tools\km\km_common.props')" />
   <PropertyGroup Label="Configuration">
     <ConfigurationType>Driver</ConfigurationType>
     <DriverType>WDM</DriverType>
-    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <PlatformToolset>WindowsKernelModeDriver</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -24,7 +26,6 @@
     <IntDir>$(SolutionDir)obj\driver\</IntDir>
     <TargetName>BraveHWID_Spoof</TargetName>
     <TargetExt>.sys</TargetExt>
-    <WdkDir>C:\Program Files (x86)\Windows Kits\10</WdkDir>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -35,18 +36,12 @@
         $(ProjectDir)include;
         $(ProjectDir)src;
         $(ProjectDir)src\cleaner;
-        $(WdkDir)\Include\$(WindowsTargetPlatformVersion)\km;
-        $(WdkDir)\Include\$(WindowsTargetPlatformVersion)\shared;
         %(AdditionalIncludeDirectories)
       </AdditionalIncludeDirectories>
       <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ntoskrnl.lib;hal.lib;wmilib.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>
-        $(WdkDir)\Lib\$(WindowsTargetPlatformVersion)\km\x64;
-        %(AdditionalLibraryDirectories)
-      </AdditionalLibraryDirectories>
       <Subsystem>Native</Subsystem>
       <EntryPointSymbol>DriverEntry</EntryPointSymbol>
     </Link>

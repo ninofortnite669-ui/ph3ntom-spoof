@@ -19,6 +19,11 @@ jobs:
         with:
           vs-version: '[17.0, 18.0)'
       
+      - name: Setup WDK
+        uses: ms-wdk/setup-wdk@v1
+        with:
+          wdk-version: '22621'
+      
       - name: Create bin directory
         run: mkdir -p hwid-spoofer\bin
         shell: cmd
@@ -26,9 +31,10 @@ jobs:
       - name: Build Driver
         shell: cmd
         run: |
+          call "${{ env.WDK_DIR }}\bin\SetEnv.cmd" /x64 /release
           call "${{ env.VS_INSTALL_PATH }}\VC\Auxiliary\Build\vcvars64.bat"
           cd hwid-spoofer\driver
-          msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\bin\ /nologo /m
+          msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\bin\ /p:WDK_DIR="${{ env.WDK_DIR }}" /nologo /m
       
       - name: Build Mapper
         shell: cmd
@@ -79,6 +85,6 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ph3ntom-spoofer-dse-bypass
+          name: BraveHWID-Spoofer-UD
           path: hwid-spoofer/bin/
           retention-days: 7

@@ -14,16 +14,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup MSBuild
+      - name: Setup MSBuild and WDK
         uses: microsoft/setup-msbuild@v2
         with:
           vs-version: '[17.0, 18.0)'
+          msbuild-architecture: x64
       
-      - name: Build Everything
+      - name: Build All in One Step
         shell: pwsh
         run: |
           # ============================================
-          # ÉTAPE 1: Détecter le WDK
+          # CONFIGURATION INITIALE
+          # ============================================
+          Write-Host "=== Début de la compilation ==="
+          
+          # Le WDK est déjà installé avec VS 2022 sur GitHub Actions
+          # setup-msbuild a déjà configuré l'environnement de base
+          
+          # ============================================
+          # DÉTECTION DU WDK
           # ============================================
           Write-Host "=== Détection du WDK ==="
           
@@ -32,23 +41,22 @@ jobs:
           $libPath = "$wdkBase\Lib"
           
           if (-not (Test-Path $includePath)) {
-            Write-Error "WDK Include path introuvable: $includePath"
+            Write-Error "WDK Include introuvable: $includePath"
             exit 1
           }
           
-          # Trouver les dossiers de version (ex: 10.0.26100.0)
+          # Trouver la version la plus récente
           $versionDirs = Get-ChildItem -Path $includePath -Directory | 
                          Where-Object { $_.Name -match "^\d+\.\d+\.\d+\.\d+$" } | 
                          Sort-Object Name -Descending
           
           if ($versionDirs.Count -eq 0) {
-            Write-Error "Aucun dossier de version WDK trouvé"
-            Get-ChildItem -Path $includePath -Directory | Select-Object Name
+            Write-Error "Aucune version WDK trouvée"
             exit 1
           }
           
           $wdkVersion = $versionDirs[0].Name
-          Write-Host "Version WDK trouvée: $wdkVersion"
+          Write-Host "Version WDK: $wdkVersion"
           
           # Vérifier ntddk.h
           $kmPath = "$includePath\$wdkVersion\km"
@@ -62,35 +70,18 @@ jobs:
           Write-Host "WDK vérifié: ntddk.h trouvé"
           
           # ============================================
-          # ÉTAPE 2: Configurer l'environnement Visual Studio
+          # CONFIGURER L'ENVIRONNEMENT MSBuild
           # ============================================
           Write-Host "=== Configuration de l'environnement ==="
           
-          $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise"
-          if (-not (Test-Path "$vsPath\VC\Auxiliary\Build\vcvars64.bat")) {
-            $vsPath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Enterprise"
-          }
-          
-          # Appeler vcvars64.bat pour configurer MSBuild
-          $vcvarsPath = "$vsPath\VC\Auxiliary\Build\vcvars64.bat"
-          if (-not (Test-Path $vcvarsPath)) {
-            Write-Error "vcvars64.bat introuvable à: $vcvarsPath"
-            exit 1
-          }
-          
-          Write-Host "Appel de vcvars64.bat..."
-          & $vcvarsPath
-          
-          # ============================================
-          # ÉTAPE 3: Configurer les chemins WDK
-          # ============================================
-          Write-Host "=== Configuration des chemins WDK ==="
+          # setup-msbuild a déjà appelé vcvars64.bat, mais on doit ajouter les chemins WDK
+          # car par défaut, le WDK n'est pas dans INCLUDE/LIB
           
           $wdkInc = "$includePath\$wdkVersion"
           $wdkKmInc = "$kmPath"
           $wdkLib = "$libPath\$wdkVersion\km\x64"
           
-          # Ajouter les chemins WDK aux variables d'environnement
+          # Ajouter les chemins WDK aux variables existantes
           $env:INCLUDE = "$wdkKmInc;$wdkInc\shared;$env:INCLUDE"
           $env:LIB = "$wdkLib;$env:LIB"
           
@@ -98,7 +89,7 @@ jobs:
           Write-Host "LIB: $env:LIB"
           
           # ============================================
-          # ÉTAPE 4: Créer le dossier de sortie
+          # CRÉER LE DOSSIER DE SORTIE
           # ============================================
           Write-Host "=== Création du dossier de sortie ==="
           if (-not (Test-Path "hwid-spoofer\bin")) {
@@ -106,82 +97,98 @@ jobs:
           }
           
           # ============================================
-          # ÉTAPE 5: Compiler le driver
+          # COMPILER LE DRIVER
           # ============================================
           Write-Host "=== Compilation du driver ==="
           
           cd hwid-spoofer\driver
           
-          # Compiler avec msbuild
-          $msbuildArgs = @(
-            "driver.vcxproj",
+          # Appeler msbuild avec les paramètres corrects
+          $msbuildResult = & msbuild driver.vcxproj @(
             "/p:Configuration=Release",
             "/p:Platform=x64",
             "/p:OutDir=..\..\bin\",
-            "/nologo",
-            "/m",
-            "/p:WindowsTargetPlatformVersion=10.0"
+            "/nologo"
           )
           
-          try {
-            & msbuild $msbuildArgs
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "Échec de la compilation du driver (code: $LASTEXITCODE)"
-              exit 1
-            }
-            Write-Host "Driver compilé avec succès"
-          } catch {
-            Write-Error "Exception lors de la compilation: $_"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Échec de la compilation du driver (code: $LASTEXITCODE)"
+            Write-Error "Sortie msbuild: $msbuildResult"
             exit 1
           }
           
+          Write-Host "✅ Driver compilé avec succès"
+          
           # ============================================
-          # ÉTAPE 6: Compiler le mapper
+          # COMPILER LE MAPPER
           # ============================================
           Write-Host "=== Compilation du mapper ==="
           
           cd ..\mapper
           
-          $msbuildArgs = @(
-            "mapper.vcxproj",
+          $msbuildResult = & msbuild mapper.vcxproj @(
             "/p:Configuration=Release",
             "/p:Platform=x64",
             "/p:OutDir=..\..\bin\",
-            "/nologo",
-            "/m"
+            "/nologo"
           )
           
-          try {
-            & msbuild $msbuildArgs
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "Échec de la compilation du mapper (code: $LASTEXITCODE)"
-              exit 1
-            }
-            Write-Host "Mapper compilé avec succès"
-          } catch {
-            Write-Error "Exception lors de la compilation: $_"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Échec de la compilation du mapper (code: $LASTEXITCODE)"
+            Write-Error "Sortie msbuild: $msbuildResult"
             exit 1
           }
+          
+          Write-Host "✅ Mapper compilé avec succès"
+          
+          # ============================================
+          # VÉRIFIER LES FICHIERS GÉNÉRÉS
+          # ============================================
+          Write-Host "=== Vérification des fichiers ==="
+          
+          cd ..\..\bin
+          $driverPath = "BraveHWID_Spoof.sys"
+          $mapperPath = "mapper.exe"
+          
+          if (-not (Test-Path $driverPath)) {
+            Write-Error "Driver non généré: $driverPath"
+            Get-ChildItem | Select-Object Name, Length
+            exit 1
+          }
+          
+          if (-not (Test-Path $mapperPath)) {
+            Write-Error "Mapper non généré: $mapperPath"
+            Get-ChildItem | Select-Object Name, Length
+            exit 1
+          }
+          
+          Write-Host "✅ Tous les fichiers générés avec succès"
+          Get-ChildItem | Select-Object Name, Length, LastWriteTime
       
-      - name: Download Intel Exploit Driver
+      - name: Download Intel Exploit
         shell: pwsh
         run: |
           Write-Host "=== Téléchargement de iqvw64e.sys ==="
           $url = "https://github.com/Ch0pin/medusa/raw/master/iqvw64e.sys"
           $out = "hwid-spoofer/bin/iqvw64e.sys"
-          Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
-          if (-not (Test-Path $out)) {
-            Write-Error "Échec du téléchargement de iqvw64e.sys"
+          
+          try {
+            Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing -ErrorAction Stop
+            if (-not (Test-Path $out)) {
+              Write-Error "Échec du téléchargement"
+              exit 1
+            }
+            Write-Host "✅ iqvw64e.sys téléchargé"
+          } catch {
+            Write-Error "Erreur lors du téléchargement: $_"
             exit 1
           }
-          Write-Host "iqvw64e.sys téléchargé"
       
       - name: Create README
         shell: pwsh
         run: |
           Write-Host "=== Création du README ==="
-          $readmePath = "hwid-spoofer/bin/README.txt"
-          @"
+          $readme = @"
 ============================================
     Brave HWID Spoofer - DSE Bypass Version
 ============================================
@@ -193,7 +200,7 @@ FILES:
 
 USAGE:
   1. Run as Administrator
-  2. cd to bin\ folder
+  2. cd to binolder
   3. mapper.exe BraveHWID_Spoof.sys iqvw64e.sys
      OR: mapper.exe (for interactive menu)
 
@@ -212,13 +219,10 @@ FEATURES:
   - Anti-Cheat Cleaner (EAC/BE/VAC)
   - ARP Spoofing
 ============================================
-"@ | Out-File -FilePath $readmePath -Encoding ASCII
-      
-      - name: List Output Files
-        shell: pwsh
-        run: |
-          Write-Host "=== Fichiers générés ==="
-          Get-ChildItem -Path "hwid-spoofer/bin" | Select-Object Name, Length, LastWriteTime
+"@
+          
+          $readme | Out-File -FilePath "hwid-spoofer/bin/README.txt" -Encoding ASCII
+          Write-Host "✅ README créé"
       
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4

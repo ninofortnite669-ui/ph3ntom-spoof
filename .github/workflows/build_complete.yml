@@ -17,10 +17,9 @@ jobs:
         with:
           vs-version: '[17.0, 18.0)'
       
-      - name: Build Everything
+      - name: Build All
         shell: pwsh
         run: |
-          # Détecter le WDK
           $wdkBase = "${env:ProgramFiles(x86)}\Windows Kits\10"
           $includePath = "$wdkBase\Include"
           $libPath = "$wdkBase\Lib"
@@ -29,17 +28,12 @@ jobs:
                          Where-Object { $_.Name -match "^\d+\.\d+\.\d+\.\d+$" } | 
                          Sort-Object Name -Descending
           
-          if ($versionDirs.Count -eq 0) {
-            Write-Error "No WDK version found"
-            exit 1
-          }
-          
           $wdkVersion = $versionDirs[0].Name
           $kmPath = "$includePath\$wdkVersion\km"
           $ntddkPath = "$kmPath\ntddk.h"
           
           if (-not (Test-Path $ntddkPath)) {
-            Write-Error "ntddk.h not found at: $ntddkPath"
+            Write-Error "ntddk.h not found"
             exit 1
           }
           
@@ -50,26 +44,17 @@ jobs:
           $env:INCLUDE = "$wdkKmInc;$wdkInc\shared;$env:INCLUDE"
           $env:LIB = "$wdkLib;$env:LIB"
           
-          # Configurer MSBuild
           $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise"
-          if (-not (Test-Path "$vsPath\VC\Auxiliary\Build\vcvars64.bat")) {
-            $vsPath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\Enterprise"
-          }
           & "$vsPath\VC\Auxiliary\Build\vcvars64.bat"
           
-          # Créer dossier de sortie
-          if (-not (Test-Path "extracted\hwid-spoofer\bin")) {
-            New-Item -ItemType Directory -Path "extracted\hwid-spoofer\bin" -Force | Out-Null
-          }
+          mkdir -Force extracted\hwid-spoofer\bin
           
-          # Compiler le driver
           cd extracted\hwid-spoofer\driver
-          & msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\..\bin\ /nologo /m /p:WindowsTargetPlatformVersion=10.0
+          & msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\..\bin\ /nologo
           if ($LASTEXITCODE -ne 0) { exit 1 }
           
-          # Compiler le mapper
           cd ..\mapper
-          & msbuild mapper.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\..\bin\ /nologo /m
+          & msbuild mapper.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\..\bin\ /nologo
           if ($LASTEXITCODE -ne 0) { exit 1 }
       
       - name: Download Intel Driver

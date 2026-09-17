@@ -17,50 +17,28 @@ jobs:
         with:
           vs-version: '[17.0, 18.0)'
       
-      - name: Build All
-        shell: pwsh
+      - name: Create bin directory
+        run: mkdir -p extracted\hwid-spoofer\bin
+        shell: cmd
+      
+      - name: Build Driver
+        shell: cmd
         run: |
-          $wdkBase = "${env:ProgramFiles(x86)}\Windows Kits\10"
-          $includePath = "$wdkBase\Include"
-          $libPath = "$wdkBase\Lib"
-          
-          $versionDirs = Get-ChildItem -Path $includePath -Directory | 
-                         Where-Object { $_.Name -match "^\d+\.\d+\.\d+\.\d+$" } | 
-                         Sort-Object Name -Descending
-          
-          $wdkVersion = $versionDirs[0].Name
-          $kmPath = "$includePath\$wdkVersion\km"
-          $ntddkPath = "$kmPath\ntddk.h"
-          
-          if (-not (Test-Path $ntddkPath)) {
-            Write-Error "ntddk.h not found"
-            exit 1
-          }
-          
-          $wdkInc = "$includePath\$wdkVersion"
-          $wdkKmInc = "$kmPath"
-          $wdkLib = "$libPath\$wdkVersion\km\x64"
-          
-          $env:INCLUDE = "$wdkKmInc;$wdkInc\shared;$env:INCLUDE"
-          $env:LIB = "$wdkLib;$env:LIB"
-          
-          $vsPath = "${env:ProgramFiles}\Microsoft Visual Studio\2022\Enterprise"
-          & "$vsPath\VC\Auxiliary\Build\vcvars64.bat"
-          
-          mkdir -Force extracted\hwid-spoofer\bin
-          
+          call "${{ env.VS_INSTALL_PATH }}\VC\Auxiliary\Build\vcvars64.bat"
           cd extracted\hwid-spoofer\driver
-          & msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\..\bin\ /nologo
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          
-          cd ..\mapper
-          & msbuild mapper.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\..\bin\ /nologo
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\..\bin\ /nologo /m
+      
+      - name: Build Mapper
+        shell: cmd
+        run: |
+          call "${{ env.VS_INSTALL_PATH }}\VC\Auxiliary\Build\vcvars64.bat"
+          cd extracted\hwid-spoofer\mapper
+          msbuild mapper.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\..\bin\ /nologo /m
       
       - name: Download Intel Driver
-        shell: pwsh
+        shell: cmd
         run: |
-          Invoke-WebRequest -Uri 'https://github.com/Ch0pin/medusa/raw/master/iqvw64e.sys' -OutFile 'extracted/hwid-spoofer/bin/iqvw64e.sys' -UseBasicParsing
+          powershell -Command "Invoke-WebRequest -Uri 'https://github.com/Ch0pin/medusa/raw/master/iqvw64e.sys' -OutFile 'extracted/hwid-spoofer/bin/iqvw64e.sys' -UseBasicParsing"
       
       - name: Upload
         uses: actions/upload-artifact@v4

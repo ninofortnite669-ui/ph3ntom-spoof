@@ -14,215 +14,67 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup MSBuild and WDK
+      - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
         with:
           vs-version: '[17.0, 18.0)'
-          msbuild-architecture: x64
       
-      - name: Build All in One Step
-        shell: pwsh
+      - name: Create bin directory
+        run: mkdir -p hwid-spoofer\bin
+        shell: cmd
+      
+      - name: Build Driver
+        shell: cmd
         run: |
-          # ============================================
-          # CONFIGURATION INITIALE
-          # ============================================
-          Write-Host "=== Début de la compilation ==="
-          
-          # Le WDK est déjà installé avec VS 2022 sur GitHub Actions
-          # setup-msbuild a déjà configuré l'environnement de base
-          
-          # ============================================
-          # DÉTECTION DU WDK
-          # ============================================
-          Write-Host "=== Détection du WDK ==="
-          
-          $wdkBase = "${env:ProgramFiles(x86)}\Windows Kits\10"
-          $includePath = "$wdkBase\Include"
-          $libPath = "$wdkBase\Lib"
-          
-          if (-not (Test-Path $includePath)) {
-            Write-Error "WDK Include introuvable: $includePath"
-            exit 1
-          }
-          
-          # Trouver la version la plus récente
-          $versionDirs = Get-ChildItem -Path $includePath -Directory | 
-                         Where-Object { $_.Name -match "^\d+\.\d+\.\d+\.\d+$" } | 
-                         Sort-Object Name -Descending
-          
-          if ($versionDirs.Count -eq 0) {
-            Write-Error "Aucune version WDK trouvée"
-            exit 1
-          }
-          
-          $wdkVersion = $versionDirs[0].Name
-          Write-Host "Version WDK: $wdkVersion"
-          
-          # Vérifier ntddk.h
-          $kmPath = "$includePath\$wdkVersion\km"
-          $ntddkPath = "$kmPath\ntddk.h"
-          
-          if (-not (Test-Path $ntddkPath)) {
-            Write-Error "ntddk.h introuvable à: $ntddkPath"
-            exit 1
-          }
-          
-          Write-Host "WDK vérifié: ntddk.h trouvé"
-          
-          # ============================================
-          # CONFIGURER L'ENVIRONNEMENT MSBuild
-          # ============================================
-          Write-Host "=== Configuration de l'environnement ==="
-          
-          # setup-msbuild a déjà appelé vcvars64.bat, mais on doit ajouter les chemins WDK
-          # car par défaut, le WDK n'est pas dans INCLUDE/LIB
-          
-          $wdkInc = "$includePath\$wdkVersion"
-          $wdkKmInc = "$kmPath"
-          $wdkLib = "$libPath\$wdkVersion\km\x64"
-          
-          # Ajouter les chemins WDK aux variables existantes
-          $env:INCLUDE = "$wdkKmInc;$wdkInc\shared;$env:INCLUDE"
-          $env:LIB = "$wdkLib;$env:LIB"
-          
-          Write-Host "INCLUDE: $env:INCLUDE"
-          Write-Host "LIB: $env:LIB"
-          
-          # ============================================
-          # CRÉER LE DOSSIER DE SORTIE
-          # ============================================
-          Write-Host "=== Création du dossier de sortie ==="
-          if (-not (Test-Path "hwid-spoofer\bin")) {
-            New-Item -ItemType Directory -Path "hwid-spoofer\bin" -Force | Out-Null
-          }
-          
-          # ============================================
-          # COMPILER LE DRIVER
-          # ============================================
-          Write-Host "=== Compilation du driver ==="
-          
+          call "${{ env.VS_INSTALL_PATH }}\VC\Auxiliary\Build\vcvars64.bat"
           cd hwid-spoofer\driver
-          
-          # Appeler msbuild avec les paramètres corrects
-          $msbuildResult = & msbuild driver.vcxproj @(
-            "/p:Configuration=Release",
-            "/p:Platform=x64",
-            "/p:OutDir=..\..\bin\",
-            "/nologo"
-          )
-          
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Échec de la compilation du driver (code: $LASTEXITCODE)"
-            Write-Error "Sortie msbuild: $msbuildResult"
-            exit 1
-          }
-          
-          Write-Host "✅ Driver compilé avec succès"
-          
-          # ============================================
-          # COMPILER LE MAPPER
-          # ============================================
-          Write-Host "=== Compilation du mapper ==="
-          
-          cd ..\mapper
-          
-          $msbuildResult = & msbuild mapper.vcxproj @(
-            "/p:Configuration=Release",
-            "/p:Platform=x64",
-            "/p:OutDir=..\..\bin\",
-            "/nologo"
-          )
-          
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Échec de la compilation du mapper (code: $LASTEXITCODE)"
-            Write-Error "Sortie msbuild: $msbuildResult"
-            exit 1
-          }
-          
-          Write-Host "✅ Mapper compilé avec succès"
-          
-          # ============================================
-          # VÉRIFIER LES FICHIERS GÉNÉRÉS
-          # ============================================
-          Write-Host "=== Vérification des fichiers ==="
-          
-          cd ..\..\bin
-          $driverPath = "BraveHWID_Spoof.sys"
-          $mapperPath = "mapper.exe"
-          
-          if (-not (Test-Path $driverPath)) {
-            Write-Error "Driver non généré: $driverPath"
-            Get-ChildItem | Select-Object Name, Length
-            exit 1
-          }
-          
-          if (-not (Test-Path $mapperPath)) {
-            Write-Error "Mapper non généré: $mapperPath"
-            Get-ChildItem | Select-Object Name, Length
-            exit 1
-          }
-          
-          Write-Host "✅ Tous les fichiers générés avec succès"
-          Get-ChildItem | Select-Object Name, Length, LastWriteTime
+          msbuild driver.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\bin\ /nologo /m
+      
+      - name: Build Mapper
+        shell: cmd
+        run: |
+          call "${{ env.VS_INSTALL_PATH }}\VC\Auxiliary\Build\vcvars64.bat"
+          cd hwid-spoofer\mapper
+          msbuild mapper.vcxproj /p:Configuration=Release /p:Platform=x64 /p:OutDir=..\..\bin\ /nologo /m
       
       - name: Download Intel Exploit
-        shell: pwsh
+        shell: cmd
         run: |
-          Write-Host "=== Téléchargement de iqvw64e.sys ==="
-          $url = "https://github.com/Ch0pin/medusa/raw/master/iqvw64e.sys"
-          $out = "hwid-spoofer/bin/iqvw64e.sys"
-          
-          try {
-            Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing -ErrorAction Stop
-            if (-not (Test-Path $out)) {
-              Write-Error "Échec du téléchargement"
-              exit 1
-            }
-            Write-Host "✅ iqvw64e.sys téléchargé"
-          } catch {
-            Write-Error "Erreur lors du téléchargement: $_"
-            exit 1
-          }
+          powershell -Command "Invoke-WebRequest -Uri 'https://github.com/Ch0pin/medusa/raw/master/iqvw64e.sys' -OutFile 'hwid-spoofer/bin/iqvw64e.sys' -UseBasicParsing"
       
       - name: Create README
-        shell: pwsh
+        shell: cmd
         run: |
-          Write-Host "=== Création du README ==="
-          $readme = @"
-============================================
-    Brave HWID Spoofer - DSE Bypass Version
-============================================
-
-FILES:
-  - BraveHWID_Spoof.sys (UNSIGNED - Uses DSE Bypass)
-  - mapper.exe (Control Interface)
-  - iqvw64e.sys (Intel Exploit for DSE Bypass)
-
-USAGE:
-  1. Run as Administrator
-  2. cd to binolder
-  3. mapper.exe BraveHWID_Spoof.sys iqvw64e.sys
-     OR: mapper.exe (for interactive menu)
-
-NOTE: Driver uses DSE bypass via iqvw64e.sys
-      No code signing required!
-
-FEATURES:
-  - BIOS/Motherboard Serial (SMBIOS)
-  - Disk Serial Numbers
-  - USB Device Serials
-  - Monitor EDID Serial
-  - MAC Addresses
-  - Volume IDs
-  - TPM Endorsement Key
-  - CPU Information
-  - Anti-Cheat Cleaner (EAC/BE/VAC)
-  - ARP Spoofing
-============================================
-"@
-          
-          $readme | Out-File -FilePath "hwid-spoofer/bin/README.txt" -Encoding ASCII
-          Write-Host "✅ README créé"
+          echo ============================================ > hwid-spoofer/bin/README.txt
+          echo    Brave HWID Spoofer - DSE Bypass Version     >> hwid-spoofer/bin/README.txt
+          echo ============================================ >> hwid-spoofer/bin/README.txt
+          echo. >> hwid-spoofer/bin/README.txt
+          echo FILES: >> hwid-spoofer/bin/README.txt
+          echo   - BraveHWID_Spoof.sys (UNSIGNED - Uses DSE Bypass) >> hwid-spoofer/bin/README.txt
+          echo   - mapper.exe (Control Interface) >> hwid-spoofer/bin/README.txt
+          echo   - iqvw64e.sys (Intel Exploit for DSE Bypass) >> hwid-spoofer/bin/README.txt
+          echo. >> hwid-spoofer/bin/README.txt
+          echo USAGE: >> hwid-spoofer/bin/README.txt
+          echo   1. Run as Administrator >> hwid-spoofer/bin/README.txt
+          echo   2. cd to bin\ folder >> hwid-spoofer/bin/README.txt
+          echo   3. mapper.exe BraveHWID_Spoof.sys iqvw64e.sys >> hwid-spoofer/bin/README.txt
+          echo   OR: mapper.exe (for interactive menu) >> hwid-spoofer/bin/README.txt
+          echo. >> hwid-spoofer/bin/README.txt
+          echo NOTE: Driver uses DSE bypass via iqvw64e.sys >> hwid-spoofer/bin/README.txt
+          echo       No code signing required! >> hwid-spoofer/bin/README.txt
+          echo. >> hwid-spoofer/bin/README.txt
+          echo FEATURES: >> hwid-spoofer/bin/README.txt
+          echo   - BIOS/Motherboard Serial (SMBIOS) >> hwid-spoofer/bin/README.txt
+          echo   - Disk Serial Numbers >> hwid-spoofer/bin/README.txt
+          echo   - USB Device Serials >> hwid-spoofer/bin/README.txt
+          echo   - Monitor EDID Serial >> hwid-spoofer/bin/README.txt
+          echo   - MAC Addresses >> hwid-spoofer/bin/README.txt
+          echo   - Volume IDs >> hwid-spoofer/bin/README.txt
+          echo   - TPM Endorsement Key >> hwid-spoofer/bin/README.txt
+          echo   - CPU Information >> hwid-spoofer/bin/README.txt
+          echo   - Anti-Cheat Cleaner (EAC/BE/VAC) >> hwid-spoofer/bin/README.txt
+          echo   - ARP Spoofing >> hwid-spoofer/bin/README.txt
+          echo ============================================ >> hwid-spoofer/bin/README.txt
       
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
